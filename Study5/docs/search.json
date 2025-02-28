@@ -1,0 +1,23 @@
+[
+  {
+    "objectID": "01_Analyses_Study5.html",
+    "href": "01_Analyses_Study5.html",
+    "title": "01_Analyses_Study5",
+    "section": "",
+    "text": "These analyses were conducted for Chapter 1 Study 5 of my dissertation. This study is currently under review at Journal of Experimental Psychology - Applied.\n\n\nIn the healthcare context, patient socioeconomic status (SES) informs how patients are perceived and treated, contributing to downstream health disparities. The current experimental research reveals the nature of such interpersonal challenges for low-SES patients. Across four experiments (total N = 1142), participants engaged in a series of mock telehealth visits with a patient who failed to follow treatment recommendations twice and were therefore noncompliant. Evidence suggests that after repeated noncompliance, low-SES patients are perceived disproportionately more harshly, as more lazy, less honest, and as exaggerating their pain more, than high-SES patients exhibiting the same behavior. These worsening perceptions of the patient predict lower intentions to invest in care for the patient in the future. Furthermore, low-SES patients receive less intense treatment than high-SES patients, regardless of patterns of noncompliance. Our findings for low-SES bias in the healthcare context are not moderated by patient race or gender. Internal meta-analyses provide additional support for these findings. This low-SES bias in the healthcare context suggests that biased perceptions of patients by their SES plays a pivotal role in social class health disparities.\n\nKeywords: bias, stereotypes, socioeconomic status, healthcare, health"
+  },
+  {
+    "objectID": "01_Analyses_Study5.html#abstract",
+    "href": "01_Analyses_Study5.html#abstract",
+    "title": "01_Analyses_Study5",
+    "section": "",
+    "text": "In the healthcare context, patient socioeconomic status (SES) informs how patients are perceived and treated, contributing to downstream health disparities. The current experimental research reveals the nature of such interpersonal challenges for low-SES patients. Across four experiments (total N = 1142), participants engaged in a series of mock telehealth visits with a patient who failed to follow treatment recommendations twice and were therefore noncompliant. Evidence suggests that after repeated noncompliance, low-SES patients are perceived disproportionately more harshly, as more lazy, less honest, and as exaggerating their pain more, than high-SES patients exhibiting the same behavior. These worsening perceptions of the patient predict lower intentions to invest in care for the patient in the future. Furthermore, low-SES patients receive less intense treatment than high-SES patients, regardless of patterns of noncompliance. Our findings for low-SES bias in the healthcare context are not moderated by patient race or gender. Internal meta-analyses provide additional support for these findings. This low-SES bias in the healthcare context suggests that biased perceptions of patients by their SES plays a pivotal role in social class health disparities.\n\nKeywords: bias, stereotypes, socioeconomic status, healthcare, health"
+  },
+  {
+    "objectID": "01_Analyses_Study5.html#ns",
+    "href": "01_Analyses_Study5.html#ns",
+    "title": "01_Analyses_Study5",
+    "section": "ns",
+    "text": "ns\n\n\nCode\nkable(table(data$study), col.names = c(\"Study\",\"n\"))\n\n\n\n\n\nStudy\nn\n\n\n\n\n1\n568\n\n\n2\n242\n\n\n3\n534\n\n\n4\n940\n\n\n\n\n\n\n\nCode\nkable(table(data_wide$conditionSES), col.names = c(\"SES Condition\", \"n\"))\n\n\n\n\n\nSES Condition\nn\n\n\n\n\nHigh SES\n569\n\n\nLow SES\n573"
+  }
+]

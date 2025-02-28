@@ -1,0 +1,22 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "Dissertation: Chapter 1 Study 5"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      # Add your other .qmd file(s) here
+      - href: your-other-file.qmd
+        text: "Data Cleaning"
+      # Add more files as needed
+  
+format:
+  html:
+    theme: cosmo
+    toc: true
+
+publish:
+  site: quartopub

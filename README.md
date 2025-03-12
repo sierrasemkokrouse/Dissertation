@@ -1,10 +1,8 @@
 # Dissertation
- 
-# Chapter 1 Study 5
 
-This repository contains my R analysis for dissertation project.
+This repository contains the data and R scripts for analysis of dissertation project.
 
-View the published documents here: 
+View the published Quarto HTMLs of the analyses in R here: 
 
 [Dissertation Chapter 1 Study 5](https://sierra-semkokrouse.quarto.pub/dissertation-chapter-1-study-5/)
 

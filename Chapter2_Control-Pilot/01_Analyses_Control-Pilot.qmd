@@ -1,0 +1,410 @@
+---
+title: "01-Analyses"
+subtitle: "Control Condition Pilot"
+format:
+  html:
+    self-contained: true
+    toc: true
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+# Description
+
+These analyses were conducted as a pilot test of the control condition for Chapter 2 of my dissertation. 
+
+# Set-up
+```{r}
+#| warning: false
+#| message: false
+#| include: false
+library(tidyverse)
+library(psych)
+library(lme4)
+library(knitr)
+library(sjPlot)
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| include: false
+theme_perez <- function() {
+    ggplot2::theme_bw() +
+    ggplot2::theme(
+      axis.text = element_text(colour = "black",  family = "Times New Roman", size = 12),
+    axis.title = element_text(colour = "black", family = "Times New Roman", size = 13),
+    legend.title = element_text(colour = "black", family = "Times New Roman", size = 13),
+    legend.text = element_text(colour = "black", family = "Times New Roman", size = 12),
+    plot.title = element_text(colour = "black", family = "Times New Roman", size = 13),
+    plot.subtitle = element_text(colour = "black", family = "Times New Roman", size = 13)
+      )
+}
+
+horzi_theme <- theme(    #   remove the gray background
+  panel.background    = element_rect( size=.1, colour="black", fill="white") ,
+  #   make the major gridlines light gray and thin
+  panel.grid.major.y  = element_line( size=.1, colour="#666666" ) ,
+  #   suppress the vertical grid lines
+  panel.grid.major.x  = element_blank() ,
+  #   suppress the minor grid lines
+  panel.grid.minor    = element_blank() ,
+  #   add axes
+  axis.line           = element_line( size=.2 , colour="#666666" ),
+  #   adjust the axis ticks
+  axis.ticks          = element_line( size=.1 , colour="#666666" ),
+  #   move the y-axis over to the left
+  #axis.title.y        = element_text( angle=90, vjust=.5, hjust=.5 ),
+  #   increase margin moved-over y-axis label fits
+  # plot.margin = unit( c(.5,.25,.25,.5) , "in") ,
+  title = element_text(  size=12 ) ,
+  axis.title.x = element_text( size=12 ) ,
+  axis.title.y = element_text( size=12 ) ,
+  axis.text.x = element_text( size=12 ) ,
+  axis.text.y = element_text( size=12 )
+)
+
+horzi <- horzi_theme
+
+stat_sum_df <- function(fun, geom="crossbar", ...) {
+  stat_summary(fun.data=fun, colour="black", geom=geom, width=.5,  ...)
+}
+
+# define the dodge object for equivalent error bar and geom_bar
+dodge <- position_dodge(width=0.9)
+
+# define a geom_bar
+bars <- geom_bar(stat="summary", fun.y="mean", position="dodge")
+```
+
+## Data 
+### Quick Cleaning
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+data <- read.csv("../Raw/Healthcare+Intervention+-+Control+Pilot+(SU24)_June+11,+2024_15.46.csv")
+
+data <- data[-c(1:2),]
+data <- data %>% 
+  select(-c(1:8, 
+            10:17,
+            27:43,
+            67:77,
+            81:84))
+
+data <- data %>% 
+  select(-c(52:55))
+
+write.csv(data, "../Analyses/Control-Pilot_Clean_Wide.csv")
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+data$ResponseId <- as.factor(data$ResponseId)
+
+longData <- 
+  data %>%
+  pivot_longer(
+    cols = treatment_1:notes_2,
+    names_to = c(".value", "strike"),
+    names_sep = "_",
+    values_drop_na = TRUE)
+
+longData$strike <- as.factor(longData$strike)
+
+write.csv(longData, "../Analyses/Control-Pilot_Clean_Long.csv")
+```
+
+# Findings TLDR
+
+* Doctors reported the issues in the control articles as being relevant to their experience.
+* Positive affect was higher (after reading articles) in active versus passive control.
+* Responses to the noncompliant patient in the scenario were slightly more negative after strike 1 for active control, but differences levelled out for strike 2. 
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+kable(table(data$Condition), col.names = c("Condition", "n"))
+```
+
+# Pre-Items
+**To what extent do you agree that this is a big issue facing healthcare providers**
+
+::: {.panel-tabset}
+
+#### Patient noncompliance
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+data %>% 
+  ggplot(aes(as.numeric(noncompliance))) +
+  geom_density() +
+  theme_classic() +
+  labs(x = "Noncompliance",
+       y = "Density") +
+  expand_limits(x=c(1:6))
+
+kable(psych::describe(as.numeric(data$noncompliance)), row.names = F)
+```
+
+#### Personnel issues
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+data %>% 
+  ggplot(aes(as.numeric(personnel))) +
+  geom_density() +
+  theme_classic() +
+  labs(x = "Personnel",
+       y = "Density") +
+  expand_limits(x=c(1:6))
+
+kable(psych::describe(as.numeric(data$personnel)), row.names = F)
+```
+
+#### Burnout
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+data %>% 
+  ggplot(aes(as.numeric(burnout))) +
+  geom_density() +
+  theme_classic() +
+  labs(x = "Burnout",
+       y = "Density") +
+  expand_limits(x=c(1:6))
+
+kable(psych::describe(as.numeric(data$burnout)), row.names = F)
+```
+
+#### Difficult patients
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+data %>% 
+  ggplot(aes(as.numeric(difficultPatients))) +
+  geom_density() +
+  theme_classic() +
+  labs(x = "Difficult Patients",
+       y = "Density") +
+  expand_limits(x=c(1:6))
+
+kable(psych::describe(as.numeric(data$difficultPatients)), row.names = F)
+```
+
+:::
+
+# Manipulation Check
+**How much do the articles reflect your experience as an HCP?**
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+data <- data %>% 
+  mutate(articleResponse = case_match(articleResponse, 
+                                        "8" ~ 5,
+                                        "9" ~ 6))
+data %>% 
+  ggplot(aes(as.numeric(articleResponse))) +
+  geom_density() +
+  theme_classic() +
+  labs(x = "Article Accuracy",
+       y = "Density") +
+  expand_limits(x=c(1:6))
+
+kable(psych::describe(as.numeric(data$articleResponse)), row.names = F)
+```
+
+# Affect
+```{r}
+#| warning: false
+#| message: false
+#| include: false
+data$PANAS_pos <- as.numeric(data$PANAS_1) + as.numeric(data$PANAS_3) + as.numeric(data$PANAS_5) + as.numeric(data$PANAS_9) + as.numeric(data$PANAS_10) + as.numeric(data$PANAS_12) + as.numeric(data$PANAS_14) + as.numeric(data$PANAS_16) + as.numeric(data$PANAS_17) + as.numeric(data$PANAS_19)
+
+data$PANAS_neg <- as.numeric(data$PANAS_2) + as.numeric(data$PANAS_4) + as.numeric(data$PANAS_6) + as.numeric(data$PANAS_7) + as.numeric(data$PANAS_8) + as.numeric(data$PANAS_11) + as.numeric(data$PANAS_13) + as.numeric(data$PANAS_15) + as.numeric(data$PANAS_18) + as.numeric(data$PANAS_20)
+```
+
+::: {.panel-tabset}
+
+#### Positive
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+tab_model(t.test(data$PANAS_pos ~ data$Condition), pred.labels = "Positive Affect")
+
+data %>% 
+  filter(Condition != "") %>% 
+  ggplot(aes(Condition, as.numeric(PANAS_pos))) +
+  geom_bar(stat="summary", fun = "mean", position="dodge") +
+  theme_classic() +
+  labs(x = "Condition",
+       y = "Positive Affect") +
+  theme(legend.position = "bottom")
+```
+
+#### Negative
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+tab_model(t.test(data$PANAS_neg ~ data$Condition), pred.labels = "Negative Affect")
+
+data %>% 
+  filter(Condition != "") %>% 
+  ggplot(aes(Condition, as.numeric(PANAS_neg))) +
+  geom_bar(stat="summary", fun = "mean", position="dodge") +
+  theme_classic() +
+  labs(x = "Condition",
+       y = "Negative Affect") +
+  theme(legend.position = "bottom")
+```
+
+:::
+
+# Scenario
+
+::: {.panel-tabset}
+
+#### First impression
+**How severe is this patient's pain?**
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+tab_model(t.test(as.numeric(data$severe) ~ data$Condition), pred.labels = "Pain Severity")
+
+data %>% 
+  filter(Condition != "") %>% 
+  ggplot(aes(Condition, as.numeric(severe))) +
+  geom_bar(stat="summary", fun = "mean", position="dodge") +
+  expand_limits(y=c(1:10)) +
+  scale_y_continuous(breaks=c(1:10)) +
+  theme_classic() +
+  labs(x = "Condition",
+       y = "Pain Severity") +
+  theme(legend.position = "bottom")
+```
+
+#### Frustration
+**This is frustrating**
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+longData %>% 
+  filter(frustrating != "NA" & Condition != "") %>% 
+ggplot(aes(Condition, as.numeric(frustrating))) +
+  geom_bar(stat="summary", fun = "mean", position="dodge") +
+    facet_wrap(~ strike) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  theme_classic() +
+  labs(x = "Strike",
+       y = "Frustration") +
+  theme(legend.position = "bottom")
+
+tab_model(t.test(as.numeric(data$frustrating_1) ~ data$Condition), title = "Strike 1", pred.labels = "Frustrating")
+
+tab_model(t.test(as.numeric(data$frustrating_2) ~ data$Condition), title = "Strike 2", pred.labels = "Frustrating")
+```
+
+#### Lazy
+**This patient is lazy**
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+longData %>% 
+  filter(lazy != "NA" & Condition != "") %>% 
+ggplot(aes(as.factor(Condition), as.numeric(lazy))) +
+  geom_bar(stat="summary", fun = "mean", position="dodge") +
+      facet_wrap(~ strike) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  theme_classic() +
+  labs(x = "Strike",
+       y = "Lazy") +
+  theme(legend.position = "bottom")
+
+tab_model(t.test(as.numeric(data$lazy_1) ~ data$Condition), title = "Strike 1", pred.labels = "Lazy")
+tab_model(t.test(as.numeric(data$lazy_2) ~ data$Condition), title = "Strike 2", pred.labels = "Lazy")
+```
+
+#### Honesty
+**This patient is honest**
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+longData %>% 
+  filter(honest != "NA" & Condition != "") %>% 
+ggplot(aes(as.factor(Condition), as.numeric(honest))) +
+  geom_bar(stat="summary", fun = "mean", position="dodge") +
+      facet_wrap(~ strike) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  theme_classic() +
+  labs(x = "Strike",
+       y = "Honest") +
+  theme(legend.position = "bottom")
+
+tab_model(t.test(as.numeric(data$honest_1) ~ data$Condition), title = "Strike 1", pred.labels = "Honest")
+tab_model(t.test(as.numeric(data$honest_2) ~ data$Condition), title = "Strike 2", pred.labels = "Honest")
+```
+
+#### Exaggerating Pain
+**This patient is exaggerating their pain**
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+longData %>% 
+  filter(exaggerate != "NA" & Condition != "") %>% 
+ggplot(aes(as.factor(Condition), as.numeric(exaggerate))) +
+  geom_bar(stat="summary", fun = "mean", position="dodge") +
+      facet_wrap(~ strike) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  theme_classic() +
+  labs(x = "Strike",
+       y = "Exaggerating Pain") +
+  theme(legend.position = "bottom")
+
+tab_model(t.test(as.numeric(data$exaggerate_1) ~ data$Condition), title = "Strike 1", pred.labels = "Exaggerating Pain")
+tab_model(t.test(as.numeric(data$exaggerate_2) ~ data$Condition), title = "Strike 2", pred.labels = "Exaggerating Pain")
+```
+
+#### Giving Up
+**I feel like giving up on this patient**
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+longData %>% 
+  filter(givingUp != "NA" & Condition != "") %>% 
+ggplot(aes(as.factor(Condition), as.numeric(givingUp))) +
+  geom_bar(stat="summary", fun = "mean", position="dodge") +
+      facet_wrap(~ strike) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  theme_classic() +
+  labs(x = "Strike",
+       y = "Give Up on Patient") +
+  theme(legend.position = "bottom")
+
+tab_model(t.test(as.numeric(data$givingUp_1) ~ data$Condition), title = "Strike 1", pred.labels = "Desire to Give Up")
+tab_model(t.test(as.numeric(data$givingUp_2) ~ data$Condition), title = "Strike 2", pred.labels = "Desire to Give Up")
+```
+
+:::

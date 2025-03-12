@@ -1,0 +1,8 @@
+- source: 00_Quick-Analyses.qmd
+  quarto-pub:
+    - id: f9e3aa96-d480-4829-b879-ad207f23c6f8
+      url: 'https://sierra-semkokrouse.quarto.pub/dissertation-chapter-2-control-pilot'
+- source: project
+  quarto-pub:
+    - id: 9d96c99f-b442-4051-afda-c8f2e723410a
+      url: 'https://sierra-semkokrouse.quarto.pub/dissertation-chapter-2-control-pilot'

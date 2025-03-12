@@ -1,0 +1,16 @@
+[
+  {
+    "objectID": "00_Quick-Analyses.html",
+    "href": "00_Quick-Analyses.html",
+    "title": "01-Analyses",
+    "section": "",
+    "text": "These analyses were conducted as a pilot test of the control condition for Chapter 2 of my dissertation."
+  },
+  {
+    "objectID": "00_Quick-Analyses.html#data",
+    "href": "00_Quick-Analyses.html#data",
+    "title": "01-Analyses",
+    "section": "Data",
+    "text": "Data\n\nQuick Cleaning\n\n\nCode\ndata &lt;- read.csv(\"../Raw/Healthcare+Intervention+-+Control+Pilot+(SU24)_June+11,+2024_15.46.csv\")\n\ndata &lt;- data[-c(1:2),]\ndata &lt;- data %&gt;% \n  select(-c(1:8, \n            10:17,\n            27:43,\n            67:77,\n            81:84))\n\ndata &lt;- data %&gt;% \n  select(-c(52:55))\n\nwrite.csv(data, \"../Analyses/Control-Pilot_Clean_Wide.csv\")\n\n\n\n\nCode\ndata$ResponseId &lt;- as.factor(data$ResponseId)\n\nlongData &lt;- \n  data %&gt;%\n  pivot_longer(\n    cols = treatment_1:notes_2,\n    names_to = c(\".value\", \"strike\"),\n    names_sep = \"_\",\n    values_drop_na = TRUE)\n\nlongData$strike &lt;- as.factor(longData$strike)\n\nwrite.csv(longData, \"../Analyses/Control-Pilot_Clean_Long.csv\")"
+  }
+]

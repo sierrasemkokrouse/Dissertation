@@ -75,6 +75,7 @@ library(effectsize)
 library(sjmisc)
 library(rstatix)
 library(gtsummary)
+library(ggpubr)
 ```
 
 ```{r, ggplot_functions}
@@ -602,3 +603,75 @@ ggplot(aes(patient, healthLit_Patient)) +
 kable(anova(lm(healthLit_Patient ~ conditionSES + conditionRace + ladder_Self + race_Self + income_Self + ed_Own + study, data_wide)))
 ```
 :::
+
+# Research Portfolio
+```{r}
+#| include: FALSE
+
+lazy <- ggplot(data=data, aes(as.factor(strike), lazy, fill=conditionSES)) +
+  geom_bar(stat="summary", fun.y="mean", position="dodge") +
+  stat_sum_df("mean_se", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  theme_perez() +
+  scale_fill_grey() +
+  xlab("Noncompliance Incident / 'Strike'") +
+  ylab("Perceived Patient Laziness") +
+  guides(fill=guide_legend(title="Patient SES")) +
+  theme(legend.position="bottom") +
+    annotate("text", x = 2, y = 3.5, label = "*", 
+           size = 8, color = "lightblue") +
+  annotate("segment", x = 1.8, xend = 2.2, y = 3.4, yend = 3.4,
+           size = 1, color = "lightblue")
+
+honesty <- ggplot(data=data, aes(factor(strike), honest, fill=conditionSES)) +
+  geom_bar(stat="summary", fun.y="mean", position="dodge") +
+  expand_limits(y=c(1:5)) +
+  stat_sum_df("mean_se", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  labs(x = "Noncompliance Incident / 'Strike'",
+       y = "Perceived Patient Honesty",
+       fill = "Patient SES") +
+  theme_perez() +
+  scale_fill_grey() +
+  theme(legend.position="none") +
+  annotate("text", x = 2, y = 4.3, label = "***", 
+           size = 8, color = "lightblue") +
+  annotate("segment", x = 1.8, xend = 2.2, y = 4.2, yend = 4.2,
+           size = 1, color = "lightblue")
+
+pain <- ggplot(data=data, aes(factor(strike), exaggerate, fill=conditionSES)) +
+  geom_bar(stat="summary", fun.y="mean", position="dodge") +
+  expand_limits(y=c(1:5)) +
+  stat_sum_df("mean_se", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  labs(x = "Noncompliance Incident / 'Strike'",
+       y = "Perceived Patient Pain Exaggeration",
+       fill = "Patient SES") +
+  theme_perez() +
+  scale_fill_grey() +
+  theme(legend.position="none") +
+  annotate("text", x = 2, y = 3.5, label = "†", 
+           size = 8, color = "lightblue") +
+  annotate("segment", x = 1.8, xend = 2.2, y = 3.2, yend = 3.2,
+           size = 1, color = "lightblue")
+
+treat <- ggplot(data=data, aes(factor(strike), treatAvg, fill=conditionSES)) +
+  geom_bar(stat="summary", fun.y="mean", position="dodge") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  expand_limits(y=c(1:4)) +
+  scale_y_continuous(breaks=c(1:4), labels=c("1","2","3","4")) +
+  xlab("Noncompliance Incident / 'Strike'") +
+  ylab("Treatment Intensity") +
+  theme_perez() +
+  scale_fill_grey() +
+  theme(legend.position="none") +
+  annotate("text", x = 1.5, y = 1.9, label = "*", size = 8, color = "lightblue") + 
+  annotate("segment", x = 1, xend = 2, y = 1.8, yend = 1.8, size = 1, color = "lightblue")
+```
+
+```{r}
+#| code-fold: true
+ggarrange(honesty, treat, ncol = 2, nrow = 1, 
+          common.legend = TRUE,
+          legend = "bottom")
+```
+

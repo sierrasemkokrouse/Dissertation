@@ -1,0 +1,1164 @@
+---
+title: "Healthcare Intervention Analyses - Pilot"
+author: "Sierra Semko"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+editor_options:
+  chunk_output_type: console
+---
+
+# Set-up
+
+```{r packages}
+#| warning: false
+#| message: false
+#| include: false
+library(psych)
+library(ggplot2)
+library(effsize)
+library(dplyr)
+# library(kableExtra)
+library(GPArotation)
+library(stats)
+library(plyr)
+library(psych)
+library(tidyverse)
+library("Hmisc")
+library(forcats)
+library(grid)
+library(ggcorrplot)
+library(corrplot)
+library(gridExtra)
+library("ggdark")
+library(broom)
+library("effects")
+library(lsmeans)
+library(diagram)
+library(pwr)
+library(dplyr)
+library(tidyr)
+library(nlme)
+library(rstatix)
+library(multcomp)
+library(lme4)
+library(lmerTest)
+library(readxl)
+library(knitr)
+library(sjPlot)
+```
+
+```{r ggplot}
+#| warning: false
+#| message: false
+#| include: false
+horzi_theme <- theme(    #   remove the gray background
+  panel.background    = element_rect( size=.1, colour="black", fill="white") ,
+  #   make the major gridlines light gray and thin
+  panel.grid.major.y  = element_line( size=.1, colour="#666666" ) ,
+  #   suppress the vertical grid lines
+  panel.grid.major.x  = element_blank() ,
+  #   suppress the minor grid lines
+  panel.grid.minor    = element_blank() ,
+  #   add axes
+  axis.line           = element_line( size=.2 , colour="#666666" ),
+  #   adjust the axis ticks
+  axis.ticks          = element_line( size=.1 , colour="#666666" ),
+  #   move the y-axis over to the left
+  #axis.title.y        = element_text( angle=90, vjust=.5, hjust=.5 ),
+  #   increase margin moved-over y-axis label fits
+  # plot.margin = unit( c(.5,.25,.25,.5) , "in") ,
+  title = element_text(  size=12 ) ,
+  axis.title.x = element_text( size=12 ) ,
+  axis.title.y = element_text( size=12 ) ,
+  axis.text.x = element_text( size=12 ) ,
+  axis.text.y = element_text( size=12 )
+)
+
+horzi <- horzi_theme
+
+stat_sum_df <- function(fun, geom="crossbar", ...) {
+  stat_summary(fun.data=fun, colour="black", geom=geom, width=.5,  ...)
+}
+
+# define the dodge object for equivalent error bar and geom_bar
+dodge <- position_dodge(width=0.9)
+
+# define a geom_bar
+bars <- geom_bar(stat="summary", fun.y="mean", position="dodge")
+```
+
+```{r data}
+#| warning: false
+#| message: false
+#| echo: false
+#| code-fold: true
+data <- read_excel("Healthcare-Intervention-Relevant-Roles.xlsx")
+
+data <- data[-1,]
+
+data$condition <- case_when(data$Condition == "1" ~ "Treatment",
+                            data$Condition == "0" ~ "Control", 
+                            TRUE ~ "NA")
+```
+
+# Data Cleaning
+## Removing Unassigned Participants
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+data <- data %>% 
+  filter(condition != "NA")
+```
+
+1 participant was not assigned and was removed. 
+
+## Response Time
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+data$`Duration (in seconds)` <- as.numeric(data$`Duration (in seconds)`)
+hist(data$`Duration (in seconds)`)
+summary(data$`Duration (in seconds)`)
+IQR(data$`Duration (in seconds)`)
+
+outliers <- 1.5*2421
+
+lower <- 1397-outliers
+upper <- 2498+outliers
+
+outliers <- data %>% 
+  filter(`Duration (in seconds)` < lower | `Duration (in seconds)` > upper)
+
+remove <- outliers$ResponseId
+
+`%!in%` <- Negate(`%in%`)
+
+data <- data %>% 
+  filter(ResponseId %!in% remove)
+```
+
+3 participants removed. 
+
+# Demographics
+
+::: {.panel-tabset}
+
+#### Gender
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+kable(prop.table(table(data$gender)), col.names = c("Gender", "n"))
+```
+
+#### Race
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+kable(prop.table(table(data$race)), col.names = c("Race", "n"))
+```
+
+#### Number of Years Worked in Profession
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+ggplot(data, aes(x=as.numeric(yearsWork_1))) +
+  geom_histogram(fill='#deebf7', color='#3182bd') +
+  theme_minimal() +
+  geom_vline(xintercept = 4, colour="red", linetype="longdash")
+
+kable(psych::describe(as.numeric(data$yearsWork_1), na.rm=TRUE), row.names = F)
+```
+
+**<span style="color: #3182bd;">Median number of years in profession</span>**
+
+#### Exposure to Low-SES Patients
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+kable(psych::describe(as.numeric(data$insurance_1), na.rm=TRUE), row.names = F)
+```
+
+#### Level of Education
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+data$edOwn <- as.factor(data$edOwn)
+levels(data$edOwn) <- c("High School", "College", "Postgraduate")
+kable(prop.table(table(data$edOwn)), col.names = c("Education", "n"))
+```
+
+#### Ladder
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+ggplot(data, aes(x=as.numeric(ladder))) +
+  geom_density(fill='#deebf7', color='#3182bd') +
+  theme_minimal() +
+  geom_vline(xintercept = 6, colour="red", linetype="longdash")
+
+kable(psych::describe(as.numeric(data$ladder), na.rm=TRUE), row.names = F)
+```
+
+**<span style="color: #3182bd;">Median position on MacArthur Ladder (1 - lowest rung; 10 - highest rung)</span>**
+
+#### Household Income
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+ggplot(data, aes(x=as.numeric(income))) +
+  geom_density(fill='#deebf7', color='#3182bd') +
+  theme_minimal() +
+  geom_vline(xintercept = 5, colour="red", linetype="longdash")
+
+kable(psych::describe(as.numeric(data$income), na.rm=TRUE), row.names = F)
+```
+
+**<span style="color: #3182bd;">Median income is between $75,001 and $100,000</span>**
+
+#### Politics
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+ggplot(data, aes(x=as.numeric(politics))) +
+  geom_density(fill='#deebf7', color='#3182bd') +
+  theme_minimal()
+
+kable(psych::describe(as.numeric(data$politics)), row.names = F)
+```
+
+**<span style="color: #3182bd;">1 = Extremely Liberal, 7 = Extremely Conservative</span>**
+
+:::
+
+# Outcomes 
+## Relationship Attitudes
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+tab_model(lm(manipulationCheck ~ condition + as.numeric(yearsWork_1), data))
+
+kable(psych::describe(as.numeric(data$manipulationCheck)), row.names = F)
+
+kable(data %>% 
+      dplyr::group_by(condition) %>% 
+      dplyr::summarise(mean = mean(as.numeric(manipulationCheck)),
+                       sd = sd(as.numeric(manipulationCheck))))
+
+ggplot(data, aes(x=condition, y=as.numeric(manipulationCheck))) +
+  geom_bar(fun="mean", stat="summary", position="dodge") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  scale_fill_grey() +
+  theme_bw() +
+  xlab("Intervention Condition") +
+  ylab("Relationship Attitudes") +
+  theme(legend.position="bottom") 
+```
+
+## Scenario
+
+*<span style="color: #3182bd;">Consider the following patient: After a healthcare visit to address her diabetes, a patient describes how she does not think that doctors and nurses are fair to people like her. She explains that this belief makes her nervous about going to clinics or hospitals, and about following the treatment plans that her doctor devises.</span>* 
+
+*<span style="color: #3182bd;">How would you respond to this patient? Please respond with at least three meaningful sentences to share.</span>*
+
+### Patient is lazy
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+tab_model(lm(lazy ~ condition + as.numeric(yearsWork_1), data))
+
+kable(psych::describe(as.numeric(data$lazy)), row.names = F)
+
+kable(data %>% 
+      dplyr::group_by(condition) %>% 
+      dplyr::summarise(mean = mean(as.numeric(lazy)),
+                       sd = sd(as.numeric(lazy))))
+
+ggplot(data, aes(x=condition, y=as.numeric(lazy))) +
+  geom_bar(fun="mean", stat="summary", position="dodge") +
+  expand_limits(y=c(1,5)) +
+    stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  scale_fill_grey() +
+  theme_bw() +
+  xlab("Intervention Condition") +
+  ylab("Patient Laziness") +
+  theme(legend.position="bottom") 
+```
+
+### I feel like giving up on patient 
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+tab_model(lm(givingUp ~ condition + as.numeric(yearsWork_1), data))
+
+kable(psych::describe(as.numeric(data$givingUp)), row.names = F)
+
+kable(data %>% 
+      dplyr::group_by(condition) %>% 
+      dplyr::summarise(mean = mean(as.numeric(givingUp)),
+                       sd = sd(as.numeric(givingUp))))
+
+ggplot(data, aes(x=condition, y=as.numeric(givingUp))) +
+  geom_bar(fun="mean", stat="summary", position="dodge") +
+  expand_limits(y=c(1,5)) +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  scale_fill_grey() +
+  theme_bw() +
+  xlab("Intervention Condition") +
+  ylab("Desire to Give Up") +
+  theme(legend.position="bottom") 
+```
+
+## Equity Engagement Index
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+data <- data %>% 
+  mutate(sdoh1 = as.numeric(sdoh1),
+         sdoh2 = as.numeric(sdoh2), 
+         culturalCompetancy1 = as.numeric(culturalCompetancy1),
+         culturalCompetancy2 = as.numeric(culturalCompetancy2),
+         petition1 = as.numeric(petition1),
+         petition2 = as.numeric(petition2)) %>% 
+  mutate(sdoh1_z = scale(sdoh1),
+         sdoh2_z = scale(sdoh2), 
+         culturalCompetancy1_z = scale(culturalCompetancy1),
+         culturalCompetancy2_z = scale(culturalCompetancy2),
+         petition1_z = scale(petition1),
+         petition2_z = scale(petition2))
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+alpha_result <- psych::alpha(data[, c("sdoh1_z", "sdoh2_z", "culturalCompetancy1_z", "culturalCompetancy2_z", "petition1_z", "petition2_z")], check.keys=TRUE)
+
+kable(alpha_result$total, row.names = F)
+
+data$equity_beh <- scoreItems(keys = c(1, 1, 1, 1, 1, 1),
+                               items = data[, c("sdoh1_z", "sdoh2_z", "culturalCompetancy1_z", "culturalCompetancy2_z", "petition1_z", "petition2_z")])$scores
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+tab_model(lm(equity_beh ~ Condition + as.numeric(yearsWork_1), data))
+
+kable(data %>% 
+      dplyr::group_by(condition) %>% 
+      dplyr::summarise(mean = mean(as.numeric(equity_beh)),
+                       sd = sd(as.numeric(equity_beh))))
+
+ggplot(data=data, aes(as.factor(Condition), equity_beh)) +
+  geom_bar(stat="summary", fun.y="mean", position="dodge") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  scale_fill_grey() +
+  theme_minimal() +
+  xlab("Intervention Condition") +
+  ylab("Equity Behavioral Intentions") +
+  theme(legend.position="bottom") 
+```
+
+# Additional Analyses
+## Comfort Answering Questions
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+kable(table(data$comfort))
+```
+
+## Professional Fulfillment Index
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+data <- data %>% 
+  mutate_at(c("PFI1_1", "PFI1_2", "PFI1_3", "PFI1_4", "PFI1_5", "PFI1_6", "PFI2_1", "PFI2_2", "PFI2_3", "PFI2_4", "PFI3_1", "PFI3_2", "PFI3_3", "PFI3_4"), as.numeric)
+
+keys.list <- list(PFI_fulfill = c('PFI1_1', 'PFI1_2', 'PFI1_3', 'PFI1_4', 'PFI1_5', 'PFI1_6'),
+                  PFI_exhaust = c('PFI2_1', 'PFI2_2', 'PFI2_3', 'PFI2_4'),
+                  PFI_disengage = c('PFI3_1', 'PFI3_2', 'PFI3_3', 'PFI3_4'))
+
+scores <- scoreItems(keys.list, data, min = 1, max = 5)  
+summary(scores, short = F)
+
+data$PFI_fulfill = scoreItems(keys.list, data, min=1, max=5)$score[,1] 
+data$PFI_exhaust = scoreItems(keys.list, data, min=1, max=5)$score[,2] 
+data$PFI_disengage = scoreItems(keys.list, data, min=1, max=5)$score[,3] 
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+mod <- lm(PFI_fulfill ~ condition, data)
+summary(mod)
+
+ggplot(data, aes(x=condition, y=as.numeric(PFI_fulfill))) +
+  geom_bar(fun="mean", stat="summary", position="dodge") +
+  expand_limits(y=c(1,5))
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+mod <- lm(PFI_exhaust ~ condition, data)
+summary(mod)
+
+ggplot(data, aes(x=condition, y=as.numeric(PFI_exhaust))) +
+  geom_bar(fun="mean", stat="summary", position="dodge") +
+  expand_limits(y=c(1,5))
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+mod <- lm(PFI_disengage ~ condition, data)
+summary(mod)
+
+ggplot(data, aes(x=condition, y=as.numeric(PFI_disengage))) +
+  geom_bar(fun="mean", stat="summary", position="dodge") +
+  expand_limits(y=c(1,5))
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+PFI_fulfill_1 <- lm(lazy ~ PFI_fulfill * condition, data)
+summary(PFI_fulfill_1)
+
+PFI_fulfill_2 <- lm(givingUp ~ PFI_fulfill * condition, data)
+summary(PFI_fulfill_2)
+
+PFI_fulfill_3 <- lm(attributions ~ PFI_fulfill * condition, data)
+summary(PFI_fulfill_3)
+
+ggplot(data, aes(color = condition, y = as.numeric(givingUp), x = PFI_fulfill)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("Professional Fulfillment") +
+  ylab("Desire to Give Up on Patient") +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+PFI_exhaust_1 <- lm(lazy~PFI_exhaust*condition, data)
+summary(PFI_exhaust_1)
+
+PFI_exhaust_2 <- lm(givingUp~PFI_exhaust*condition, data)
+summary(PFI_exhaust_2)
+
+PFI_exhaust_3 <- lm(attributions~PFI_exhaust*condition, data)
+summary(PFI_exhaust_3)
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+PFI_disengage_1 <- lm(lazy~PFI_disengage*condition, data)
+summary(PFI_disengage_1)
+
+PFI_disengage_2 <- lm(givingUp~PFI_disengage*condition, data)
+summary(PFI_disengage_2)
+
+PFI_disengage_3 <- lm(attributions~PFI_disengage*condition, data)
+summary(PFI_disengage_3)
+```
+
+## Workload
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+data$nasatlxMental_1 <- as.numeric(data$nasatlxMental_1)
+data$nasatlxTemporal_1 <- as.numeric(data$nasatlxTemporal_1)
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+mental_1 <- lm(lazy~nasatlxMental_1*condition, data)
+summary(mental_1)
+
+mental_2 <- lm(givingUp~nasatlxMental_1*condition, data)
+summary(mental_2)
+
+mental_3 <- lm(attributions~nasatlxMental_1*condition, data)
+summary(mental_3)
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+cor(data$nasatlxMental_1, data$PFI_disengage)
+cor(data$nasatlxMental_1, data$PFI_exhaust)
+cor(data$nasatlxMental_1, data$PFI_fulfill)
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+temporal_1 <- lm(lazy~nasatlxTemporal_1*condition, data)
+summary(temporal_1)
+
+temporal_2 <- lm(givingUp~nasatlxTemporal_1*condition, data)
+summary(temporal_2)
+
+temporal_3 <- lm(attributions~nasatlxTemporal_1*condition, data)
+summary(temporal_3)
+```
+
+## Social Determinants of Health
+
+::: {.panel-tabset}
+
+#### Learning More
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+t.test(as.numeric(data$sdoh1) ~ data$condition)
+
+ggplot(data, aes(x=condition, y=as.numeric(sdoh1))) +
+  geom_bar(fun="mean", stat="summary", position="dodge") +
+  expand_limits(y=c(1,5))
+```
+
+#### 10-hour Training
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+t.test(as.numeric(data$sdoh2) ~ data$condition)
+
+ggplot(data, aes(x=condition, y=as.numeric(sdoh2))) +
+  geom_bar(fun="mean", stat="summary", position="dodge") +
+  expand_limits(y=c(1,5))
+```
+
+:::
+
+## Cultural Competency
+
+::: {.panel-tabset}
+
+### Learning More
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+t.test(as.numeric(data$culturalCompetancy1) ~ data$condition)
+
+ggplot(data, aes(x=condition, y=as.numeric(culturalCompetancy1))) +
+  geom_bar(fun="mean", stat="summary", position="dodge") +
+  expand_limits(y=c(1,5))
+```
+
+#### 10-hour Training
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+t.test(as.numeric(data$culturalCompetancy2) ~ data$condition)
+
+ggplot(data, aes(x=condition, y=as.numeric(culturalCompetancy2))) +
+  geom_bar(fun="mean", stat="summary", position="dodge") +
+  expand_limits(y=c(1,5))
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+alpha_result <- psych::alpha(data[, c("sdoh1", "sdoh2", "culturalCompetancy1", "culturalCompetancy2")], check.keys=TRUE)
+
+kable(alpha_result$total, row.names = F)
+
+keys.list <- list(c("sdoh1", "sdoh2", "culturalCompetancy1", "culturalCompetancy2"))
+
+data$trainings <- scoreItems(keys = c(1, 1, 1, 1),
+                               items = data[, c("sdoh1", "sdoh2", "culturalCompetancy1", "culturalCompetancy2")],
+                               min = 1, 
+                               max = 5)$scores
+
+t.test(trainings ~ Condition, data)
+
+ggplot(data=data, aes(as.factor(Condition), trainings)) +
+  geom_bar(stat="summary", fun.y="mean", position="dodge") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  scale_fill_grey() +
+  theme_minimal() +
+  xlab("Intervention Condition") +
+  ylab("Behavioral Intentions") +
+  theme(legend.position="bottom") 
+```
+
+:::
+
+## Petitions
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+alpha_result <- psych::alpha(data[, c("petition1", "petition2")], check.keys=TRUE)
+kable(alpha_result$total, row.names = F)
+
+keys.list <- list(c("petition1", "petition2"))
+
+data$petitions <- scoreItems(keys = c(1, 1),
+                               items = data[, c("petition1", "petition2")],
+                               min = 0, 
+                               max = 1)$scores
+
+summary(glm(petitions ~ condition, data = data, family = binomial))
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+data$petition1 <- as.factor(data$petition1)
+
+mod_log1 <- glm(petition1 ~ condition, data=data, family = binomial)
+summary(mod_log1)
+
+mod_log1 %>%
+tidy(exponentiate = T, conf.int = T) %>%
+mutate_if(is.numeric, ~ round(.,3))
+
+prop.table(table(data$condition, data$petition1))
+
+ggplot(data, aes(x=petition1, fill = condition)) +
+  geom_bar(fun="mean", stat="count", position="dodge") +
+  scale_x_discrete(labels = c("Do not add my name", "Add my name")) +
+  theme_bw()
+
+data$petition2 <- as.factor(data$petition2)
+
+mod_log2 <- glm(formula = petition2 ~ condition, data=data, family = binomial)
+
+mod_log2 %>%
+tidy(exponentiate = T, conf.int = T) %>%
+mutate_if(is.numeric, ~ round(.,3))
+
+ggplot(data, aes(x=petition2, fill = condition)) +
+  geom_bar(fun="mean", stat="count", position="dodge") +
+  scale_x_discrete(labels = c("Do not add my name", "Add my name")) +
+  theme_bw()
+
+prop.table(table(data$condition, data$petition2))
+```
+
+## Donations
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+data$donation_1 <- as.numeric(data$donation_1)
+data$donation_2 <- as.numeric(data$donation_2)
+
+t.test(data$donation_1 ~ data$condition)
+
+ggplot(data, aes(x=condition, y=as.numeric(donation_1))) +
+  geom_bar(fun="mean", stat="summary", position="dodge") +
+  expand_limits(y=c(0,100))
+
+t.test(data$donation_2 ~ data$condition)
+
+ggplot(data, aes(x=condition, y=as.numeric(donation_2))) +
+  geom_bar(fun="mean", stat="summary", position="dodge") +
+  expand_limits(y=c(0,100))
+
+data$donation_diff <- data$donation_1 - data$donation_2
+t.test(data$donation_diff ~ data$condition)
+
+ggplot(data, aes(x=condition, y=as.numeric(donation_diff))) +
+  geom_bar(fun="mean", stat="summary", position="dodge") +
+  expand_limits(y=c(0,100))
+```
+
+## Scenario
+
+::: {.panel-tabset}
+
+#### Patient is lazy
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+summary(lm(lazy ~ condition * IRI2, data))
+summary(lm(lazy ~ condition * IRI4, data))
+summary(lm(lazy ~ condition * IRI6, data))
+
+ggplot(data, aes(color = condition, y = as.numeric(lazy), x = IRI4)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("If I'm sure I'm right about something, I don't \nwaste much time listening to patients’ arguments.") +
+  ylab("Patient Laziness") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+ggplot(data, aes(color = condition, y = as.numeric(lazy), x = IRI6)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("When I'm frustrated with a patient, I usually try \nto put myself in his/her shoes for a while.") +
+  ylab("Patient Laziness") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+summary(lm(lazy ~ condition * IRI1, data))
+summary(lm(lazy ~ condition * IRI3, data))
+summary(lm(lazy ~ condition * IRI5, data))
+
+ggplot(data, aes(color = condition, y = as.numeric(lazy), x = IRI3)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("Patients' misfortunes do not usually disturb me a great deal.") +
+  ylab("Patient Laziness") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+summary(lm(lazy ~ condition * as.numeric(insurance_1), data))
+summary(lm(lazy ~ condition * as.numeric(yearsWork_1), data))
+summary(lm(lazy ~ condition * as.numeric(ladder), data))
+summary(lm(lazy ~ condition * as.numeric(income), data))
+```
+
+#### I feel like giving up 
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+summary(lm(givingUp ~ condition * IRI2, data))
+summary(lm(givingUp ~ condition * IRI4, data))
+summary(lm(givingUp ~ condition * IRI6, data))
+
+ggplot(data, aes(color = condition, y = as.numeric(givingUp), x = IRI4)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("If I'm sure I'm right about something, I don't \nwaste much time listening to patients’ arguments.") +
+  ylab("Desire to Give Up on Patient") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+ggplot(data, aes(color = condition, y = as.numeric(givingUp), x = IRI6)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("When I'm frustrated with a patient, I usually try \nto put myself in his/her shoes for a while.") +
+  ylab("Desire to Give Up on Patient") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+summary(lm(givingUp ~ condition * IRI1, data))
+summary(lm(givingUp ~ condition * IRI3, data))
+summary(lm(givingUp ~ condition * IRI5, data))
+
+ggplot(data, aes(color = condition, y = as.numeric(givingUp), x = IRI1)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("I often have tender, concerned feelings for patients less fortunate than I am.") +
+  ylab("Desire to Give Up on Patient") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+ggplot(data, aes(color = condition, y = as.numeric(givingUp), x = IRI3)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("Patients' misfortunes do not usually disturb me a great deal.") +
+  ylab("Patient Honesty") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+ggplot(data, aes(color = condition, y = as.numeric(givingUp), x = IRI5)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("When I see a patient being taken advantage of,\n I feel kind of protective towards them.") +
+  ylab("Patient Honesty") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+summary(lm(givingUp ~ condition * as.numeric(insurance_1), data))
+summary(lm(givingUp ~ condition * as.numeric(yearsWork_1), data))
+summary(lm(givingUp ~ condition * as.numeric(ladder), data))
+summary(lm(givingUp ~ condition * as.numeric(income), data))
+```
+
+#### Patient not taking inititative
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+t.test(as.numeric(data$initiative) ~ as.factor(data$condition))
+
+ggplot(data, aes(x=condition, y=as.numeric(initiative))) +
+  geom_bar(fun="mean", stat="summary", position="dodge") +
+  expand_limits(y=c(1,5))
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+summary(lm(initiative ~ condition * IRI2, data))
+summary(lm(initiative ~ condition * IRI4, data))
+summary(lm(initiative ~ condition * IRI6, data))
+
+summary(lm(initiative ~ condition * IRI1, data))
+summary(lm(initiative ~ condition * IRI3, data))
+summary(lm(initiative ~ condition * IRI5, data))
+
+summary(lm(initiative ~ condition * as.numeric(insurance_1), data))
+summary(lm(initiative ~ condition * as.numeric(yearsWork_1), data))
+summary(lm(initiative ~ condition * as.numeric(ladder), data))
+summary(lm(initiative ~ condition * as.numeric(income), data))
+```
+
+#### Patient is honest
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+t.test(as.numeric(data$honest) ~ as.factor(data$condition))
+
+ggplot(data, aes(x=condition, y=as.numeric(honest))) +
+  geom_bar(fun="mean", stat="summary", position="dodge") +
+  expand_limits(y=c(1,5))
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+summary(lm(honest ~ condition * IRI2, data))
+summary(lm(honest ~ condition * IRI4, data))
+summary(lm(honest ~ condition * IRI6, data))
+
+ggplot(data, aes(color = condition, y = as.numeric(honest), x = IRI2)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("I sometimes try to understand my patients better by \nimagining how things look from their perspective.") +
+  ylab("Patient Honesty") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+ggplot(data, aes(color = condition, y = as.numeric(honest), x = IRI4)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("If I'm sure I'm right about something, I don't \nwaste much time listening to patients’ arguments.") +
+  ylab("Patient Honesty") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+ggplot(data, aes(color = condition, y = as.numeric(honest), x = IRI6)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("When I'm frustrated with a patient, I usually try \nto put myself in his/her shoes for a while.") +
+  ylab("Patient Honesty") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+summary(lm(honest ~ condition * IRI1, data))
+summary(lm(honest ~ condition * IRI3, data))
+summary(lm(honest ~ condition * IRI5, data))
+
+ggplot(data, aes(color = condition, y = as.numeric(honest), x = IRI1)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("I often have tender, concerned feelings for patients less fortunate than I am.") +
+  ylab("Patient Honesty") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+ggplot(data, aes(color = condition, y = as.numeric(honest), x = IRI3)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("Patients' misfortunes do not usually disturb me a great deal.") +
+  ylab("Patient Honesty") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+summary(lm(honest ~ condition * as.numeric(insurance_1), data))
+summary(lm(honest ~ condition * as.numeric(yearsWork_1), data))
+summary(lm(honest ~ condition * as.numeric(ladder), data))
+summary(lm(honest ~ condition * as.numeric(income), data))
+
+ggplot(data, aes(color = condition, y = as.numeric(honest), x = as.numeric(income))) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("Household Income") +
+  ylab("Patient Honesty") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+```
+
+#### Patient is motivated
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+t.test(as.numeric(data$motivated) ~ as.factor(data$condition))
+
+ggplot(data, aes(x=condition, y=as.numeric(motivated))) +
+  geom_bar(fun="mean", stat="summary", position="dodge") +
+  expand_limits(y=c(1,5))
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+summary(lm(motivated ~ condition * IRI2, data))
+summary(lm(motivated ~ condition * IRI4, data))
+summary(lm(motivated ~ condition * IRI6, data))
+
+ggplot(data, aes(color = condition, y = as.numeric(motivated), x = IRI4)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("If I'm sure I'm right about something, I don't \nwaste much time listening to patients’ arguments.") +
+  ylab("Patient Motivation") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+summary(lm(motivated ~ condition * IRI1, data))
+summary(lm(motivated ~ condition * IRI3, data))
+summary(lm(motivated ~ condition * IRI5, data))
+
+ggplot(data, aes(color = condition, y = as.numeric(motivated), x = IRI1)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("I often have tender, concerned feelings for patients less fortunate than I am.") +
+  ylab("Patient Motivation") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+ggplot(data, aes(color = condition, y = as.numeric(motivated), x = IRI3)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("Patients' misfortunes do not usually disturb me a great deal.") +
+  ylab("Patient Motivation") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+summary(lm(motivated ~ condition * as.numeric(insurance_1), data))
+summary(lm(motivated ~ condition * as.numeric(yearsWork_1), data))
+summary(lm(motivated ~ condition * as.numeric(ladder), data))
+summary(lm(motivated ~ condition * as.numeric(income), data))
+
+ggplot(data, aes(color = condition, y = as.numeric(motivated), x = as.numeric(income))) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("Household Income") +
+  ylab("Patient Motivation") +
+  expand_limits(y=c(1,5), x=c(1,7)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+```
+
+#### Important to me that patient improves
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+t.test(as.numeric(data$healthImproves) ~ as.factor(data$condition))
+
+ggplot(data, aes(x=condition, y=as.numeric(healthImproves))) +
+  geom_bar(fun="mean", stat="summary", position="dodge") +
+  expand_limits(y=c(1,5))
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+summary(lm(healthImproves ~ condition * IRI2, data))
+summary(lm(healthImproves ~ condition * IRI4, data))
+summary(lm(healthImproves ~ condition * IRI6, data))
+
+ggplot(data, aes(color = condition, y = as.numeric(healthImproves), x = IRI4)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("If I'm sure I'm right about something, I don't \nwaste much time listening to patients’ arguments.") +
+  ylab("Important to me that patient's health improves") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+ggplot(data, aes(color = condition, y = as.numeric(healthImproves), x = IRI6)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("When I'm frustrated with a patient, I usually try \nto put myself in his/her shoes for a while.") +
+  ylab("Important to me that patient's health improves") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+summary(lm(healthImproves ~ condition * IRI1, data))
+summary(lm(healthImproves ~ condition * IRI3, data))
+summary(lm(healthImproves ~ condition * IRI5, data))
+
+ggplot(data, aes(color = condition, y = as.numeric(healthImproves), x = IRI1)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("I often have tender, concerned feelings for patients less fortunate than I am.") +
+  ylab("Important to me that patient's health improves") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+ggplot(data, aes(color = condition, y = as.numeric(healthImproves), x = IRI5)) +
+  stat_smooth(method = "lm", se = F, fullrange = T) + 
+  xlab("When I see a patient being taken advantage of,\n I feel kind of protective towards them.") +
+  ylab("Important to me that patient's health improves") +
+  expand_limits(y=c(1,5), x=c(1,5)) +
+  theme_bw() +
+  scale_color_manual(values=c("#d9d9d9","#252525")) +
+  labs(color = "Condition") +
+  theme(legend.position="bottom")
+
+summary(lm(healthImproves ~ condition * as.numeric(insurance_1), data))
+summary(lm(healthImproves ~ condition * as.numeric(yearsWork_1), data))
+summary(lm(healthImproves ~ condition * as.numeric(ladder), data))
+summary(lm(healthImproves ~ condition * as.numeric(income), data))
+```
+
+#### Attributions for patient behavior
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+t.test(as.numeric(data$attributions) ~ as.factor(data$condition))
+
+ggplot(data, aes(x=condition, y=as.numeric(attributions))) +
+  geom_bar(fun="mean", stat="summary", position="dodge") +
+  expand_limits(y=c(1,5))
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+summary(lm(attributions ~ condition * IRI2, data))
+summary(lm(attributions ~ condition * IRI4, data))
+summary(lm(attributions ~ condition * IRI6, data))
+
+summary(lm(attributions ~ condition * IRI1, data))
+summary(lm(attributions ~ condition * IRI3, data))
+summary(lm(attributions ~ condition * IRI5, data))
+
+summary(lm(attributions ~ condition * as.numeric(insurance_1), data))
+summary(lm(attributions ~ condition * as.numeric(yearsWork_1), data))
+summary(lm(attributions ~ condition * as.numeric(ladder), data))
+summary(lm(attributions ~ condition * as.numeric(income), data))
+```
+
+:::
+
+## Before Intervention
+
+::: {.panel-tabset}
+
+### IRI
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+data <- data %>% 
+  mutate_at(c("IRI1", "IRI3", "IRI5", "IRI2", "IRI4", "IRI6"), as.numeric)
+
+keys.list <- list(IRI_EC = c('IRI1', '-IRI3', 'IRI5'),
+                  IRI_PT = c('IRI2', '-IRI4', 'IRI6'))
+
+scores <- scoreItems(keys.list, data, min = 1, max = 5)  
+summary(scores, short = F)
+
+data$IRI_EC = scoreItems(keys.list, data, min=1, max=5)$score[,1] 
+data$IRI_PT = scoreItems(keys.list, data, min=1, max=5)$score[,2]
+```
+
+## Values
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+data$valuesTreatment
+data$valuesControl
+```
+
+:::

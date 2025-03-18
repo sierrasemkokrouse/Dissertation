@@ -12,9 +12,10 @@ editor_options:
 
 # Description
 
-These analyses were conducted as a pilot test of the control condition for Chapter 2 of my dissertation. 
+These analyses were conducted as a pilot test of the control condition for Chapter 2 of my dissertation.
 
 # Set-up
+
 ```{r}
 #| warning: false
 #| message: false
@@ -78,26 +79,29 @@ dodge <- position_dodge(width=0.9)
 bars <- geom_bar(stat="summary", fun.y="mean", position="dodge")
 ```
 
-## Data 
+## Data
+
 ### Quick Cleaning
+
 ```{r}
+getwd()
 #| warning: false
 #| message: false
 #| code-fold: true
-data <- read.csv("../Raw/Healthcare+Intervention+-+Control+Pilot+(SU24)_June+11,+2024_15.46.csv")
+data <- read.csv("Healthcare+Intervention+-+Control+Pilot+(SU24)_June+11,+2024_15.46.csv")
 
 data <- data[-c(1:2),]
 data <- data %>% 
-  select(-c(1:8, 
-            10:17,
-            27:43,
-            67:77,
-            81:84))
+  select(-c(1:7, 
+            9:16,
+            26:42,
+            66:76,
+            80:83))
 
 data <- data %>% 
   select(-c(52:55))
 
-write.csv(data, "../Analyses/Control-Pilot_Clean_Wide.csv")
+write.csv(data, "Control-Pilot_Clean_Wide.csv")
 ```
 
 ```{r}
@@ -116,14 +120,14 @@ longData <-
 
 longData$strike <- as.factor(longData$strike)
 
-write.csv(longData, "../Analyses/Control-Pilot_Clean_Long.csv")
+write.csv(longData, "Control-Pilot_Clean_Long.csv")
 ```
 
 # Findings TLDR
 
-* Doctors reported the issues in the control articles as being relevant to their experience.
-* Positive affect was higher (after reading articles) in active versus passive control.
-* Responses to the noncompliant patient in the scenario were slightly more negative after strike 1 for active control, but differences levelled out for strike 2. 
+-   Doctors reported the issues in the control articles as being relevant to their experience.
+-   Positive affect was higher (after reading articles) in active versus passive control.
+-   Responses to the noncompliant patient in the scenario were slightly more negative after strike 1 for active control, but differences levelled out for strike 2.
 
 ```{r}
 #| warning: false
@@ -133,11 +137,12 @@ kable(table(data$Condition), col.names = c("Condition", "n"))
 ```
 
 # Pre-Items
+
 **To what extent do you agree that this is a big issue facing healthcare providers**
 
-::: {.panel-tabset}
-
+::: panel-tabset
 #### Patient noncompliance
+
 ```{r}
 #| warning: false
 #| message: false
@@ -154,6 +159,7 @@ kable(psych::describe(as.numeric(data$noncompliance)), row.names = F)
 ```
 
 #### Personnel issues
+
 ```{r}
 #| warning: false
 #| message: false
@@ -170,6 +176,7 @@ kable(psych::describe(as.numeric(data$personnel)), row.names = F)
 ```
 
 #### Burnout
+
 ```{r}
 #| warning: false
 #| message: false
@@ -186,6 +193,7 @@ kable(psych::describe(as.numeric(data$burnout)), row.names = F)
 ```
 
 #### Difficult patients
+
 ```{r}
 #| warning: false
 #| message: false
@@ -200,11 +208,12 @@ data %>%
 
 kable(psych::describe(as.numeric(data$difficultPatients)), row.names = F)
 ```
-
 :::
 
 # Manipulation Check
+
 **How much do the articles reflect your experience as an HCP?**
+
 ```{r}
 #| warning: false
 #| message: false
@@ -225,6 +234,7 @@ kable(psych::describe(as.numeric(data$articleResponse)), row.names = F)
 ```
 
 # Affect
+
 ```{r}
 #| warning: false
 #| message: false
@@ -234,9 +244,9 @@ data$PANAS_pos <- as.numeric(data$PANAS_1) + as.numeric(data$PANAS_3) + as.numer
 data$PANAS_neg <- as.numeric(data$PANAS_2) + as.numeric(data$PANAS_4) + as.numeric(data$PANAS_6) + as.numeric(data$PANAS_7) + as.numeric(data$PANAS_8) + as.numeric(data$PANAS_11) + as.numeric(data$PANAS_13) + as.numeric(data$PANAS_15) + as.numeric(data$PANAS_18) + as.numeric(data$PANAS_20)
 ```
 
-::: {.panel-tabset}
-
+::: panel-tabset
 #### Positive
+
 ```{r}
 #| warning: false
 #| message: false
@@ -254,6 +264,7 @@ data %>%
 ```
 
 #### Negative
+
 ```{r}
 #| warning: false
 #| message: false
@@ -269,15 +280,15 @@ data %>%
        y = "Negative Affect") +
   theme(legend.position = "bottom")
 ```
-
 :::
 
 # Scenario
 
-::: {.panel-tabset}
-
+::: panel-tabset
 #### First impression
+
 **How severe is this patient's pain?**
+
 ```{r}
 #| warning: false
 #| message: false
@@ -297,7 +308,9 @@ data %>%
 ```
 
 #### Frustration
+
 **This is frustrating**
+
 ```{r}
 #| warning: false
 #| message: false
@@ -320,7 +333,9 @@ tab_model(t.test(as.numeric(data$frustrating_2) ~ data$Condition), title = "Stri
 ```
 
 #### Lazy
+
 **This patient is lazy**
+
 ```{r}
 #| warning: false
 #| message: false
@@ -342,7 +357,9 @@ tab_model(t.test(as.numeric(data$lazy_2) ~ data$Condition), title = "Strike 2", 
 ```
 
 #### Honesty
+
 **This patient is honest**
+
 ```{r}
 #| warning: false
 #| message: false
@@ -364,7 +381,9 @@ tab_model(t.test(as.numeric(data$honest_2) ~ data$Condition), title = "Strike 2"
 ```
 
 #### Exaggerating Pain
+
 **This patient is exaggerating their pain**
+
 ```{r}
 #| warning: false
 #| message: false
@@ -386,7 +405,9 @@ tab_model(t.test(as.numeric(data$exaggerate_2) ~ data$Condition), title = "Strik
 ```
 
 #### Giving Up
+
 **I feel like giving up on this patient**
+
 ```{r}
 #| warning: false
 #| message: false
@@ -406,5 +427,4 @@ ggplot(aes(as.factor(Condition), as.numeric(givingUp))) +
 tab_model(t.test(as.numeric(data$givingUp_1) ~ data$Condition), title = "Strike 1", pred.labels = "Desire to Give Up")
 tab_model(t.test(as.numeric(data$givingUp_2) ~ data$Condition), title = "Strike 2", pred.labels = "Desire to Give Up")
 ```
-
 :::

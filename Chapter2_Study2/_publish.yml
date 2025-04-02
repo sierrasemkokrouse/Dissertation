@@ -1,0 +1,6 @@
+- source: 01_Analyses.qmd
+  quarto-pub:
+    - id: f3dca67f-22a2-4d29-a75c-b81b55c737e3
+      url: 'https://sierrasemkokrouse.quarto.pub/healthcare-intervention_study3_analyses'
+    - id: 569fcc0a-b25d-44aa-a63f-78b8cb140bb9
+      url: 'https://sierra-semkokrouse.quarto.pub/dissertation-chapter-2-study-2'

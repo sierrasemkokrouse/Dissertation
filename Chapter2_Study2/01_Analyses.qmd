@@ -1,0 +1,941 @@
+---
+title: "01_Analyses"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r libraries}
+#| warning: false
+#| message: false
+#| include: false
+
+library(psych)
+library(ggplot2)
+library(effsize)
+library(dplyr)
+#library(kableExtra)
+library(GPArotation)
+library(stats)
+library(plyr)
+library(psych)
+library(tidyverse)
+library("Hmisc")
+library(forcats)
+library(grid)
+library(ggcorrplot)
+library(corrplot)
+library(gridExtra)
+library("ggdark")
+library(broom)
+library("effects")
+library(lsmeans)
+library(diagram)
+library(pwr)
+library(dplyr)
+library(tidyr)
+library(nlme)
+library(rstatix)
+library(multcomp)
+library(lme4)
+library(lmerTest)
+library(knitr)
+library(magrittr)
+library(sjPlot)
+library(ggpubr)
+library(effectsize)
+```
+
+```{r ggplot-settings}
+#| warning: false
+#| message: false
+#| include: false
+
+horzi_theme <- theme(    #   remove the gray background
+  panel.background    = element_rect( size=.1, colour="black", fill="white") ,
+  #   make the major gridlines light gray and thin
+  panel.grid.major.y  = element_line( size=.1, colour="#666666" ) ,
+  #   suppress the vertical grid lines
+  panel.grid.major.x  = element_blank() ,
+  #   suppress the minor grid lines
+  panel.grid.minor    = element_blank() ,
+  #   add axes
+  axis.line           = element_line( size=.2 , colour="#666666" ),
+  #   adjust the axis ticks
+  axis.ticks          = element_line( size=.1 , colour="#666666" ),
+  #   move the y-axis over to the left
+  #axis.title.y        = element_text( angle=90, vjust=.5, hjust=.5 ),
+  #   increase margin moved-over y-axis label fits
+  # plot.margin = unit( c(.5,.25,.25,.5) , "in") ,
+  title = element_text(  size=12 ) ,
+  axis.title.x = element_text( size=12 ) ,
+  axis.title.y = element_text( size=12 ) ,
+  axis.text.x = element_text( size=12 ) ,
+  axis.text.y = element_text( size=12 )
+)
+
+horzi <- horzi_theme
+
+stat_sum_df <- function(fun, geom="crossbar", ...) {
+  stat_summary(fun.data=fun, colour="black", geom=geom, width=.5,  ...)
+}
+
+# define the dodge object for equivalent error bar and geom_bar
+dodge <- position_dodge(width=0.9)
+
+# define a geom_bar
+bars <- geom_bar(stat="summary", fun.y="mean", position="dodge")
+
+theme_perez <- function() {
+    ggplot2::theme_bw() +
+    ggplot2::theme(
+      axis.text = element_text(colour = "black",  family = "Times New Roman", size = 12),
+    axis.title = element_text(colour = "black", family = "Times New Roman", size = 13),
+    legend.title = element_text(colour = "black", family = "Times New Roman", size = 13),
+    legend.text = element_text(colour = "black", family = "Times New Roman", size = 12),
+    plot.title = element_text(colour = "black", family = "Times New Roman", size = 13),
+    plot.subtitle = element_text(colour = "black", family = "Times New Roman", size = 13),
+    strip.text = element_text(colour = "black", family = "Times New Roman", size = 13))
+}
+```
+
+```{r data}
+#| warning: false
+#| message: false
+#| include: false
+
+data <- read.csv("Data-Clean_Wide_20250225.csv")
+dataLong <- read.csv("Data-Clean_Long_20250225.csv")
+```
+
+# Overview
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+
+data <- data %>% 
+  mutate(Condition = case_match(Condition,
+                                "Control_Active" ~ "Control",
+                                "Treatment_1" ~ "Trust & Perspectives",
+                                "Treatment_2" ~ "Strategies & Outcomes"))
+
+dataLong <- dataLong %>% 
+  mutate(Condition = case_match(Condition,
+                                "Control_Active" ~ "Control",
+                                "Treatment_1" ~ "Trust & Perspectives",
+                                "Treatment_2" ~ "Strategies & Outcomes"))
+
+kable(table(data$Condition), col.names = c("Condition", "n"))
+```
+
+| Condition | Description |
+|-----------|-------------|
+| Active Control | Self-Explanatory |
+| Treatment 1 | "Mindset" Articles |
+| Treatment 2 | "Prescriptive" Articles |
+
+::: {.callout-important collapse="true"}
+## Click to See Treatment 1 Articles 
+![Article 1](Articles/Healthcare Intervention - Treatment 1.png)
+![Article 2](Articles/SU24_Treat2_Healthcare-Intervention.png)
+:::
+
+::: {.callout-important collapse="true"}
+## Click to See Treatment 2 Articles 
+![Article 3](Articles/SU24_Treat3_Healthcare-Intervention.png)
+
+![Article 4](Articles/Healthcare Intervention - Treatment 4.png)
+:::
+
+# Relationship Attitudes
+
+::: panel-tabset
+
+#### α
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+alpha_result <- psych::alpha(data[, c("manipCheck2", "manipCheck1")], check.keys=TRUE)
+kable(alpha_result$total)
+```
+
+#### Models
+
+::: panel-tabset
+#### Item 1 
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+modManip1 <- lm(manipCheck1 ~ Condition + insurance_Patient + ladder + income + workInsurancePercent_1 + yearsWork_1, data)
+tab_model(modManip1)
+kable(emmeans::eff_size(emmeans(modManip1, ~Condition), sigma = sigma(modManip1), edf = df.residual(modManip1)))
+emmManip1 <- emmeans(modManip1, "Condition")
+pairsManip1 <- pairs(emmManip1)
+kable(pairsManip1)
+kable(data %>% 
+        filter(!is.na(manipCheck1)) %>% 
+        dplyr::group_by(as.factor(Condition)) %>% 
+        dplyr::summarise(mean = mean(manipCheck1),
+                         sd = sd(manipCheck1)))
+```
+
+#### Item 2
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+modManip2 <- lm(manipCheck2 ~ Condition + insurance_Patient + ladder + income + workInsurancePercent_1 + yearsWork_1, data)
+tab_model(modManip2)
+kable(emmeans::eff_size(emmeans(modManip2, ~Condition), sigma = sigma(modManip2), edf = df.residual(modManip2)))
+emmManip2 <- emmeans(modManip2, "Condition")
+pairsManip2 <- pairs(emmManip2)
+kable(pairsManip2)
+kable(data %>% 
+        filter(!is.na(manipCheck2)) %>% 
+        dplyr::group_by(as.factor(Condition)) %>% 
+        dplyr::summarise(mean = mean(manipCheck2),
+                         sd = sd(manipCheck2)))
+```
+
+```{r}
+#| include: false
+tab_model(modManip2, modManip1, show.se = T)
+```
+
+:::
+
+#### Plots
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+item1 <- data %>% 
+ggplot(aes(x=Condition, y=manipCheck1)) +
+  geom_bar(stat="summary", position="dodge", fill = "grey40") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  geom_jitter(alpha = 0.3) +
+  expand_limits(y = c(1, 6)) +
+  theme_bw() +
+  theme_perez() +
+  scale_x_discrete(limits = c("Control", "Trust & Perspectives", "Strategies & Outcomes"),
+                   labels = c("Control", "Trust & \nPerspectives", "Strategies & \nOutcomes")) +
+  labs(y = "It is NOT possible to prioritize a \nhigh-quality relationship with every patient.")
+
+item2 <- data %>% 
+ggplot(aes(x=Condition, y=manipCheck2)) +
+  geom_bar(stat="summary", position="dodge", fill = "grey40") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  geom_jitter(alpha = 0.3) +
+  expand_limits(y = c(1, 6)) +
+  theme_bw() +
+  theme_perez() +
+  scale_x_discrete(limits = c("Control", "Trust & Perspectives", "Strategies & Outcomes"),
+                   labels = c("Control", "Trust & \nPerspectives", "Strategies & \nOutcomes")) +
+  labs(y = "Patients will take advantage of you if \nyou ask for their input too often.")
+
+plot <- ggarrange(item1, item2)
+
+annotate_figure(plot, top = text_grob("Relationship Attitudes", face = "bold", size = 14))
+```
+
+:::
+
+# Lay Theories 
+
+::: panel-tabset
+#### α
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+alpha_result <- psych::alpha(data[, c("layTheories_1", "layTheories_2", "layTheories_3")])
+
+kable(print(alpha_result$total), row.names = F)
+
+keys.list <- list(c("layTheories_1", "layTheories_2", "layTheories_3"))
+
+data$layTheores_combined <- scoreItems(keys = c(1, 1, 1),
+                               items = data[, c("layTheories_1", "layTheories_2", "layTheories_3")],
+                               min = 1, 
+                               max = 6)$scores
+```
+
+#### Model 
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+modTheories <- lm(layTheores_combined ~ Condition + yearsWork_1, data = data)
+tab_model(modTheories, show.se = T)
+kable(emmeans::eff_size(emmeans(modTheories, ~Condition), sigma = sigma(modTheories), edf = df.residual(modTheories)))
+emmTheor2 <- emmeans(modTheories, "Condition")
+pairsTheor2 <- pairs(emmTheor2)
+kable(pairsTheor2)
+kable(data %>% 
+        dplyr::group_by(as.factor(Condition)) %>% 
+        dplyr::summarise(mean = mean(layTheores_combined),
+                         sd = sd(layTheores_combined)))
+```
+
+#### Plot
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+
+data %>% 
+ggplot(aes(x=Condition, y=layTheores_combined)) +
+  geom_bar(stat="summary", position="dodge", fill = "grey40") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68) +
+  geom_jitter(alpha = 0.3) +
+  expand_limits(y = c(1, 6)) +
+  theme_bw() +
+  theme_perez() +
+  scale_x_discrete(limits = c("Control", "Trust & Perspectives", "Strategies & Outcomes"),
+                   labels = c("Control", "Trust & \nPerspectives", "Strategies & \nOutcomes")) +
+  labs(y = "Lay Theories of Patients")
+```
+
+:::
+
+::: {.callout-important collapse="true"}
+#### Individual Outcomes 
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+modLayTheories1 <- lm(layTheories_1 ~ Condition + insurance_Patient + ladder + income + workInsurancePercent_1 + yearsWork_1, data)
+tab_model(modLayTheories1)
+emmLayTheories1 <- emmeans(modLayTheories1, "Condition")
+pairsLayTheories1 <- pairs(emmLayTheories1)
+kable(pairsLayTheories1)
+
+data %>% 
+ggplot(aes(x=Condition, y=layTheories_1)) +
+  geom_bar(stat="summary", position="dodge", fill="lightblue", color = "grey40") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  expand_limits(y = c(1, 6)) +
+  theme_bw() +
+  labs(y = "The kind of patient someone is \nis something very basic about them and \nit can't be changed very much.")
+
+modLayTheories2 <- lm(layTheories_2 ~ Condition + insurance_Patient + ladder + income + workInsurancePercent_1 + yearsWork_1, data)
+tab_model(modLayTheories2)
+emmLayTheories2 <- emmeans(modLayTheories2, "Condition")
+pairsLayTheories2 <- pairs(emmLayTheories2)
+kable(pairsLayTheories2)
+
+data %>% 
+ggplot(aes(x=Condition, y=layTheories_2)) +
+  geom_bar(stat="summary", position="dodge", fill="lightblue", color = "grey40") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  expand_limits(y = c(1, 6)) +
+  theme_bw() +
+  labs(y = "Patients can do things differently, \nbut the important parts of who they are \ncan't really be changed.")
+
+modLayTheories3 <- lm(layTheories_3 ~ Condition + insurance_Patient + ladder + income + workInsurancePercent_1 + yearsWork_1, data)
+tab_model(modLayTheories3)
+emmLayTheories3 <- emmeans(modLayTheories3, "Condition")
+pairsLayTheories3 <- pairs(emmLayTheories3)
+kable(pairsLayTheories3)
+
+data %>% 
+ggplot(aes(x=Condition, y=layTheories_3)) +
+  geom_bar(stat="summary", position="dodge", fill="lightblue", color = "grey40") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  expand_limits(y = c(1, 6)) +
+  theme_bw() +
+  labs(y = "Every patient is a certain kind of person \nand there is not much that can be done \nto really change that.")
+```
+
+:::
+
+# Vignette
+
+## Main Outcomes
+
+::: {.panel-tabset}
+
+#### Patient Laziness
+
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+modLazy <- lmer(lazy ~ Condition * strike + ladder + income + workInsurancePercent_1 + yearsWork_1 + insurance_Patient + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+# summary(modLazy)
+
+modLazy <- lmer(lazy ~ Condition + strike + ladder + income + workInsurancePercent_1 + yearsWork_1 + insurance_Patient + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+tab_model(modLazy, title = "Main Effect Model Output")
+kable(emmeans::eff_size(emmeans(modLazy, ~Condition), sigma = sigma(modLazy), edf = df.residual(modLazy)))
+kable(emmeans::eff_size(emmeans(modLazy, ~strike), sigma = sigma(modLazy), edf = df.residual(modLazy)))
+
+kable(psych::describe(dataLong$lazy), row.names = F)
+
+ggplot(data=dataLong, aes(as.factor(strike), lazy, fill=Condition)) +
+  geom_bar(stat="summary", fun.y="mean", position="dodge") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  scale_fill_grey() +
+  theme_minimal() +
+  xlab("Noncompliance Incident / 'Strike'") +
+  ylab("Patient Laziness") +
+  guides(fill=guide_legend(title="Intervention Condition")) +
+  theme(legend.position="bottom") 
+```
+
+#### Patient Honesty
+
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+modHon <- lmer(honest ~ Condition * strike + insurance_Patient + ladder + income + workInsurancePercent_1 + yearsWork_1 + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+# summary(modHon)
+
+modHon <- lmer(honest ~ Condition + strike + insurance_Patient + ladder + income + workInsurancePercent_1 + yearsWork_1 + trainingWhere +  (1|ResponseId), data=dataLong, na.action=na.omit)
+tab_model(modHon, title = "Main Effect Model Output", show.ci = F, show.se = T)
+kable(emmeans::eff_size(emmeans(modHon, ~Condition), sigma = sigma(modHon), edf = df.residual(modHon)))
+kable(emmeans::eff_size(emmeans(modHon, ~strike), sigma = sigma(modHon), edf = df.residual(modHon)))
+
+kable(psych::describe(dataLong$honest), row.names = F)
+
+dataLong %>% 
+ggplot(aes(x=Condition, y=honest)) +
+  geom_bar(stat="summary", position="dodge", fill = "grey40") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  geom_jitter(alpha = 0.3) +
+  expand_limits(y = c(1, 6)) +
+  theme_bw() +
+  theme_perez() +
+  scale_x_discrete(limits = c("Control", "Trust & Perspectives", "Strategies & Outcomes"),
+                   labels = c("Control", "Trust & \nPerspectives", "Strategies & \nOutcomes")) +
+  labs(y = "Patient Honesty") 
+```
+
+#### Patient Pain Exaggeration
+
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+modExag <- lmer(exaggerate ~ Condition * strike + insurance_Patient + ladder + income + workInsurancePercent_1 + yearsWork_1 + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+# summary(modExag)
+
+modExag <- lmer(exaggerate ~ Condition + strike + insurance_Patient + ladder + income + workInsurancePercent_1 + yearsWork_1 + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+tab_model(modExag, title = "Main Effect Model Output", show.ci = F, show.se = T)
+kable(emmeans::eff_size(emmeans(modExag, ~strike), sigma = sigma(modExag), edf = df.residual(modExag)))
+
+kable(psych::describe(dataLong$exaggerate), row.names = F)
+
+kable(dataLong %>% 
+  filter(!is.na(exaggerate)) %>% 
+  dplyr::group_by(Condition) %>% 
+  dplyr::summarise(mean = mean(exaggerate)))
+
+ggplot(data=dataLong, aes(as.factor(strike), exaggerate, fill=Condition)) +
+  geom_bar(stat="summary", fun.y="mean", position="dodge") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  scale_fill_grey() +
+  theme_minimal() +
+  xlab("Noncompliance Incident / 'Strike'") +
+  ylab("Patient Exaggerating Pain") +
+  guides(fill=guide_legend(title="Intervention Condition")) +
+  theme(legend.position="bottom")
+```
+
+#### Frustration 
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+modFrust <- lmer(frustrating ~ Condition * strike + ladder + income + workInsurancePercent_1 + yearsWork_1 + insurance_Patient + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+# summary(modFrust)
+
+modFrust <- lmer(frustrating ~ Condition + strike + ladder + income + workInsurancePercent_1 + yearsWork_1 + insurance_Patient + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+tab_model(modFrust, title = "Main Effect Model Output", show.ci = F, show.se = T)
+kable(emmeans::eff_size(emmeans(modFrust, ~Condition), sigma = sigma(modFrust), edf = df.residual(modFrust)))
+kable(emmeans::eff_size(emmeans(modFrust, ~strike), sigma = sigma(modFrust), edf = df.residual(modFrust)))
+emmFrust <- emmeans(modFrust, "Condition")
+pairsFrust <- pairs(emmFrust)
+kable(pairsFrust)
+
+kable(psych::describe(dataLong$frustrating), row.names = F)
+
+kable(dataLong %>% 
+  filter(!is.na(frustrating)) %>% 
+  dplyr::group_by(Condition) %>% 
+  dplyr::summarise(mean = mean(frustrating),
+                   sd = sd(frustrating)))
+
+ggplot(data=dataLong, aes(as.factor(Condition), frustrating)) +
+  geom_bar(stat="summary", fun.y="mean", position="dodge") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  scale_fill_grey() +
+  theme_minimal() +
+  xlab("Intervention Condition") +
+  ylab("Frustration with Patient") +
+  theme(legend.position="bottom") 
+```
+
+#### Desire to Give Up 
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+modGiveUp <- lmer(givingUp ~ Condition * strike + ladder + income + workInsurancePercent_1 + yearsWork_1 + insurance_Patient + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+# summary(modGiveUp)
+
+modGiveUp <- lmer(givingUp ~ Condition + strike + ladder + income + workInsurancePercent_1 + yearsWork_1 + insurance_Patient + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+tab_model(modGiveUp, title = "Main Effect Model Output")
+
+kable(dataLong %>% 
+  filter(!is.na(givingUp)) %>% 
+  dplyr::group_by(Condition) %>% 
+  dplyr::summarise(mean = mean(givingUp)))
+
+ggplot(data=dataLong, aes(as.factor(Condition), givingUp)) +
+  geom_bar(stat="summary", fun.y="mean", position="dodge") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  scale_fill_grey() +
+  theme_minimal() +
+  xlab("Intervention Condition") +
+  ylab("Giving Up") +
+  theme(legend.position="bottom") 
+```
+
+#### Patient Deservingness 
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+modDeserve <- lmer(deserve ~ Condition * strike + ladder + income + workInsurancePercent_1 + yearsWork_1 + insurance_Patient + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+# summary(modDeserve)
+
+modDeserve <- lmer(deserve ~ Condition + strike + ladder + income + workInsurancePercent_1 + yearsWork_1 + insurance_Patient + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+tab_model(modDeserve, show.ci = F, show.se = T)
+kable(emmeans::eff_size(emmeans(modDeserve, ~Condition), sigma = sigma(modDeserve), edf = df.residual(modDeserve)))
+kable(emmeans::eff_size(emmeans(modDeserve, ~strike), sigma = sigma(modDeserve), edf = df.residual(modDeserve)))
+emmDeserve <- emmeans(modDeserve, "Condition")
+pairsDeserve <- pairs(emmDeserve)
+kable(pairsDeserve)
+
+kable(psych::describe(dataLong$deserve), row.names = F)
+
+ggplot(data=dataLong, aes(as.factor(Condition), deserve, fill=as.factor(strike))) +
+  geom_bar(stat="summary", fun.y="mean", position="dodge") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  scale_fill_grey() +
+  theme_minimal() +
+  xlab("Intervention Condition") +
+  ylab("Patient Deservingness of Help") +
+  guides(fill=guide_legend(title="Noncompliance Incident / 'Strike'")) +
+  theme(legend.position="bottom") 
+```
+
+#### Patient Motivation 
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+modMotiv <- lmer(motivated ~ Condition * strike + ladder + income + workInsurancePercent_1 + yearsWork_1 + insurance_Patient + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+# summary(modMotiv)
+
+modMotiv <- lmer(motivated ~ Condition + strike + ladder + income + workInsurancePercent_1 + yearsWork_1 + insurance_Patient + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+tab_model(modMotiv, title = "Main Effect Model Output")
+
+ggplot(data=dataLong, aes(as.factor(strike), motivated, fill=Condition)) +
+  geom_bar(stat="summary", fun.y="mean", position="dodge") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  scale_fill_grey() +
+  theme_minimal() +
+  xlab("Noncompliance Incident / 'Strike'") +
+  ylab("Patient Motivated") +
+  guides(fill=guide_legend(title="Intervention Condition")) +
+  theme(legend.position="bottom") 
+```
+
+#### Patient Intelligence 
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+modIntell <- lmer(intelligent ~ Condition * strike + ladder + income + workInsurancePercent_1 + yearsWork_1 + insurance_Patient + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+# summary(modIntell)
+
+modIntell <- lmer(intelligent ~ Condition + strike + ladder + income + workInsurancePercent_1 + yearsWork_1 + insurance_Patient + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+tab_model(modIntell, title = "Main Effect Model Output", show.ci = F, show.se = T)
+kable(emmeans::eff_size(emmeans(modIntell, ~Condition), sigma = sigma(modIntell), edf = df.residual(modIntell)))
+kable(emmeans::eff_size(emmeans(modIntell, ~strike), sigma = sigma(modIntell), edf = df.residual(modIntell)))
+
+kable(psych::describe(dataLong$intelligent), row.names = F)
+
+ggplot(data=dataLong, aes(as.factor(Condition), intelligent)) +
+  geom_bar(stat="summary", fun.y="mean", position="dodge") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  scale_fill_grey() +
+  theme_minimal() +
+  xlab("Intervention Condition") +
+  ylab("Patient Intelligence") +
+  theme(legend.position="bottom") 
+```
+
+#### Attributions for Patient Noncompliance
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+modAttrib <- lmer(attributions ~ Condition * strike + ladder + income + workInsurancePercent_1 + yearsWork_1 + insurance_Patient + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+# summary(modAttrib)
+
+modAttrib <- lmer(attributions ~ Condition + strike + ladder + income + workInsurancePercent_1 + yearsWork_1 + insurance_Patient + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+tab_model(modAttrib, title = "Main Effect Model Output")
+
+ggplot(data=dataLong, aes(as.factor(Condition), attributions)) +
+  geom_bar(stat="summary", fun.y="mean", position="dodge") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  scale_fill_grey() +
+  theme_minimal() +
+  xlab("Intervention Condition") +
+  ylab("Attributons for Patient Behavior") +
+  theme(legend.position="bottom") 
+```
+
+#### Treatment 
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+modTreat <- lmer(treatAvg ~ Condition * strike + ladder + income + workInsurancePercent_1 + yearsWork_1 + insurance_Patient + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+# summary(modTreat)
+
+modTreat <- lmer(treatAvg ~ Condition + strike + ladder + income + workInsurancePercent_1 + yearsWork_1 + insurance_Patient + trainingWhere + (1|ResponseId), data=dataLong, na.action=na.omit)
+tab_model(modTreat, title = "Main Effect Model Output", show.ci = F, show.se = T)
+kable(emmeans::eff_size(emmeans(modTreat, ~Condition), sigma = sigma(modTreat), edf = df.residual(modTreat)))
+kable(emmeans::eff_size(emmeans(modTreat, ~strike), sigma = sigma(modTreat), edf = df.residual(modTreat)))
+
+kable(psych::describe(dataLong$treatAvg), row.names = F)
+
+ggplot(data=dataLong, aes(Condition, treatAvg, fill=Condition)) +
+  geom_bar(stat="summary", fun.y="mean", position="dodge") +
+  stat_sum_df("mean_cl_boot", geom = "errorbar", position= position_dodge(.9), conf.int=.68, width=0.2) +
+  expand_limits(y=c(1:5)) +
+  scale_y_continuous(breaks=c(1:5)) +
+  scale_fill_grey() +
+  theme_minimal() +
+  xlab("Intervention Condition") +
+  ylab("Treatment Decisions") +
+  theme(legend.position="bottom") 
+```
+
+:::
+
+## Perceived Patient Demographics
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+hist(data$ladder_Patient)
+psych::describe(data$ladder_Patient)
+
+hist(data$insurance_Patient)
+
+kable(table(factor(data$income_Patient, labels = c("<$15k", "$15-30k", "$31-50k", "$50-75k", "$75-100k", "$100-150k"))))
+kable(psych::describe(data$income_Patient), row.names = F)
+
+kable(table(factor(data$ed_Patient, labels = c("< HS", "HS", "College", "Postgrad"))))
+```
+
+## Equity Engagement
+
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+data <- data %>% 
+  mutate(sdoh1_z = scale(sdoh1),
+         sdoh2_z = scale(sdoh2), 
+         culturalCompetancy1_z = scale(culturalCompetancy1),
+         culturalCompetancy2_z = scale(culturalCompetancy2),
+         petition1_z = scale(petition1),
+         petition2_z = scale(petition2))
+```
+
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+alpha_result <- psych::alpha(data[, c("sdoh1_z", "sdoh2_z", "culturalCompetancy1_z", "culturalCompetancy2_z", "petition1_z", "petition2_z")], check.keys=TRUE)
+
+kable(alpha_result$total, row.names = F)
+
+data$equity_beh <- scoreItems(keys = c(1, 1, 1, 1, 1, 1),
+                               items = data[, c("sdoh1_z", "sdoh2_z", "culturalCompetancy1_z", "culturalCompetancy2_z", "petition1_z", "petition2_z")])$scores
+```
+
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+tab_model(lm(equity_beh ~ Condition + yearsWork_1 + workInsurancePercent_1 + trainingWhere, data = data))
+```
+
+# Demographics
+
+## Personal
+
+::: panel-tabset
+#### Gender
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+kable(data %>% 
+  mutate(gender = factor(gender, labels = c("Male", "Female", "Non-conform", "NA"))) %>% 
+  group_by(gender) %>%
+  tally(name = "total") %>% 
+  mutate(percentage = total / sum(total) * 100))
+```
+
+#### Race
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+kable(data %>% 
+  mutate(race = factor(race, labels = c("White", "Asian", "Black", "Latinx", "East Asian", "Multiracial", "Other"))) %>% 
+  group_by(race) %>%
+  tally(name = "total") %>% 
+  mutate(percentage = total / sum(total) * 100))
+```
+
+#### Politics
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+kable(psych::describe(data$politics), row.names = F)
+
+data %>% 
+  ggplot(aes(politics)) +
+  geom_density() +
+  theme_bw()
+```
+
+#### Income
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+kable(data %>% 
+  mutate(income = factor(income, labels = c("<15k", "15-30", "30-50", "50-75", "75-100", "100-150", "150+"))) %>% 
+  group_by(income) %>% 
+    tally(name = "total") %>% 
+    mutate(percentage = total / sum(total) * 100))
+
+data %>% 
+  ggplot(aes(income)) +
+  geom_density() +
+  theme_bw()
+
+kable(psych::describe(data$income), row.names = F)
+```
+
+#### Ladder
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+data %>% 
+  ggplot(aes(ladder)) +
+  geom_density() +
+  theme_bw()
+
+kable(psych::describe(data$ladder), row.names = F)
+```
+
+:::
+
+## Professional
+
+::: panel-tabset
+
+#### Work Experience 
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+data %>% 
+  ggplot(aes(yearsWork_1)) +
+  geom_density() +
+  theme_bw()
+
+kable(psych::describe(data$yearsWork_1), row.names = F)
+```
+
+#### Training Location 
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+kable(data %>% 
+  mutate(trainingWhere = factor(trainingWhere)) %>% 
+  group_by(trainingWhere) %>% 
+    tally(name = "total") %>% 
+    mutate(percentage = total / sum(total) * 100))
+```
+
+#### Exposure to Low-SES Patients 
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+data %>% 
+  ggplot(aes(workInsurancePercent_1)) +
+  geom_density() +
+  theme_bw()
+
+kable(psych::describe(data$workInsurancePercent_1))
+```
+
+:::
+
+::: {.callout-important collapse="true"}
+# Additional Outcomes
+
+## Professional Fulfillment Index
+
+::: {.panel-tabset}
+
+#### Overall
+```{r PFI} 
+#| echo: false
+#| warning: false
+#| code-fold: true
+alpha_result <- psych::alpha(data[, c("PFI1_1", "PFI1_2", "PFI1_3", "PFI1_4", "PFI1_5", "PFI1_6", "PFI2_1", "PFI2_2", "PFI2_3", "PFI2_4", "PFI3_1", "PFI3_2", "PFI3_3", "PFI3_4", "PFI3_5", "PFI3_6")], check.keys=TRUE)
+
+kable(alpha_result$total, row.names = F) # Overall alpha
+# print(alpha_result$alpha.drop) # Alpha if item deleted
+# print(alpha_result$item.stats) # Item statistics
+
+data %<>% mutate(PFI = ((PFI1_1 + PFI1_2 + PFI1_3 + PFI1_4 + PFI1_5 + PFI1_6 + PFI2_1 + PFI2_2 + PFI2_3 + PFI2_4 + PFI3_1 + PFI3_2 + PFI3_3 + PFI3_4 + PFI3_5 + PFI3_6) / 16))
+
+tab_model(lm(PFI ~ Condition + yearsWork_1, data = data), title = "Overall PFI")
+kable(psych::describe(data$PFI), row.names = F)
+```
+
+#### Professional Fulfillment
+```{r PF} 
+#| echo: false
+#| warning: false
+#| code-fold: true
+alpha_result <- psych::alpha(data[, c("PFI1_1", "PFI1_2", "PFI1_3", "PFI1_4", "PFI1_5", "PFI1_6")])
+
+kable(alpha_result$total, row.names = F) # Overall alpha
+# print(alpha_result$alpha.drop) # Alpha if item deleted
+# print(alpha_result$item.stats) # Item statistics
+
+data %<>% mutate(PFI_PF = ((PFI1_1 + PFI1_2 + PFI1_3 + PFI1_4 + PFI1_5 + PFI1_6) / 6))
+
+tab_model(lm(PFI_PF ~ Condition + yearsWork_1, data = data), title = "PFI - Professional Fulfillment")
+kable(psych::describe(data$PFI_PF), row.names = F)
+```
+
+#### Work Exhaustion
+```{r burnout} 
+#| echo: false
+#| warning: false
+#| code-fold: true
+alpha_result <- psych::alpha(data[, c("PFI2_1", "PFI2_2", "PFI2_3", "PFI2_4")])
+
+kable(alpha_result$total, row.names = F) # Overall alpha
+# print(alpha_result$alpha.drop) # Alpha if item deleted
+# print(alpha_result$item.stats) # Item statistics
+
+data %<>% mutate(PFI_exhaustion = ((PFI2_1 + PFI2_2 + PFI2_3 + PFI2_4) / 4))
+
+tab_model(lm(PFI_exhaustion ~ Condition + yearsWork_1, data = data), title = "PFI - Exhaustion")
+kable(psych::describe(data$PFI_exhaustion), row.names = F)
+```
+
+#### Interpersonal Disengagement
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+alpha_result <- psych::alpha(data[, c("PFI3_1", "PFI3_2", "PFI3_3", "PFI3_4", "PFI3_5", "PFI3_6")])
+
+kable(alpha_result$total, row.names = F) # Overall alpha
+# print(alpha_result$alpha.drop) # Alpha if item deleted
+# print(alpha_result$item.stats) # Item statistics
+
+data %<>% mutate(PFI_disengagement = ((PFI3_1 + PFI3_2 + PFI3_3 + PFI3_4 + PFI3_5 + PFI3_6) / 6))
+
+tab_model(lm(PFI_disengagement ~ Condition + yearsWork_1, data = data), title = "PFI = Disengagement")
+kable(psych::describe(data$PFI_disengagement), row.names = F)
+```
+
+:::
+
+## Trainings
+
+::: {.panel-tabset}
+
+#### SDoH
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+tab_model(lm(sdoh1 ~ Condition + yearsWork_1 + workInsurancePercent_1 + trainingWhere, data = data))
+tab_model(lm(sdoh2 ~ Condition + yearsWork_1 + workInsurancePercent_1 + trainingWhere, data = data))
+```
+
+#### Cultural Competency
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+tab_model(lm(culturalCompetancy1 ~ Condition + yearsWork_1 + workInsurancePercent_1 + trainingWhere, data = data))
+tab_model(lm(culturalCompetancy2 ~ Condition + yearsWork_1 + workInsurancePercent_1 + trainingWhere, data = data))
+```
+
+:::
+
+## Petitions
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+tab_model(glm(petition1 ~ Condition + workInsurancePercent_1 + trainingWhere, data = data, family = binomial))
+tab_model(glm(petition2 ~ Condition + workInsurancePercent_1 + trainingWhere, data = data, family = binomial))
+```
+
+## Donation
+```{r}
+#| echo: false
+#| warning: false
+#| code-fold: true
+tab_model(lm(donation_1 ~ Condition + yearsWork_1 + workInsurancePercent_1 + trainingWhere, data))
+tab_model(lm(donation_2 ~ Condition + yearsWork_1 + workInsurancePercent_1 + trainingWhere, data))
+```
+
+:::
